@@ -31,6 +31,9 @@ data class UiState(
     val searching: Boolean = false,
     val results: List<Series> = emptyList(),
     val searched: Boolean = false,
+    val trending: List<Series> = emptyList(),
+    val newEpisodes: List<Series> = emptyList(),
+    val loadingTrending: Boolean = false,
 
     val series: Series? = null,
     val seasons: List<Season> = emptyList(),
@@ -48,7 +51,7 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
 
     private val settings = SettingsRepo(app)
     private var cfg = SettingsRepo.Config()
-    private val broker = Broker(settings) { cfg }
+    private val broker = Broker { cfg }
 
     private val _ui = MutableStateFlow(UiState())
     val ui: StateFlow<UiState> = _ui.asStateFlow()
@@ -71,6 +74,7 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
                 if (c.paired) {
                     refreshHosts()
                     startPolling()
+                    if (_ui.value.trending.isEmpty()) loadTrending()
                 } else {
                     stopPolling()
                 }
@@ -94,12 +98,37 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refreshHosts() = viewModelScope.launch {
         runCatching { broker.hosts() }
-            .onSuccess { _ui.value = _ui.value.copy(hosts = it, error = null) }
+            .onSuccess {
+                _ui.value = _ui.value.copy(hosts = it, error = null)
+                if (it.isNotEmpty() && _ui.value.trending.isEmpty()) loadTrending()
+            }
             .onFailure { fail(it) }
     }
 
     // ── browsing ─────────────────────────────────────────────────────────────
-    fun setQuery(q: String) { _ui.value = _ui.value.copy(query = q) }
+    fun setQuery(q: String) {
+        // Clearing the box should return to the trending rail, not a stale result set.
+        _ui.value = if (q.isBlank()) _ui.value.copy(query = q, searched = false, results = emptyList())
+                    else _ui.value.copy(query = q)
+    }
+
+    /** Populate the home rail. Needs a connected PC, so it is retried whenever
+     *  one appears rather than failing the screen permanently. */
+    fun loadTrending() = viewModelScope.launch {
+        if (_ui.value.loadingTrending) return@launch
+        _ui.value = _ui.value.copy(loadingTrending = true)
+        // Both rails come from the same PC round-trip; load them together so the
+        // home screen never renders half-populated.
+        runCatching {
+            val top = broker.trending()
+            val fresh = runCatching { broker.newEpisodes() }.getOrDefault(emptyList())
+            top to fresh
+        }.onSuccess { (top, fresh) ->
+            _ui.value = _ui.value.copy(
+                trending = top, newEpisodes = fresh, loadingTrending = false
+            )
+        }.onFailure { _ui.value = _ui.value.copy(loadingTrending = false) }
+    }
 
     fun search() = viewModelScope.launch {
         val q = _ui.value.query.trim()

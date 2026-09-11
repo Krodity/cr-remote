@@ -125,7 +125,10 @@
         if (msg?.cmd === "control") return reply(await control(msg.action, msg.value));
         reply({ error: "unknown cmd" });
       } catch (e) {
-        reply({ error: e?.message || String(e) });
+        // Carry page identity even on failure: the top frame answers every
+        // control call with "no video in this frame", and that reply is the
+        // only place episodeId can come from when merging frames.
+        reply({ error: e?.message || String(e), ...meta() });
       }
     })();
     return true;                                 // keep the channel open for async

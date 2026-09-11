@@ -19,7 +19,7 @@ import java.net.UnknownHostException
  * (503/502 vs a 200 with an error field), so they are flattened here into one
  * BrokerException carrying a message that is already fit to put on screen.
  */
-class Broker(private val settings: SettingsRepo, private val config: () -> SettingsRepo.Config) {
+class Broker(private val config: () -> SettingsRepo.Config) {
 
     private val gson = Gson()
 
@@ -102,6 +102,13 @@ class Broker(private val settings: SettingsRepo, private val config: () -> Setti
     }
 
     suspend fun search(q: String): List<Series> = rpc("search", mapOf("q" to q)).list("series")
+
+    /** The home rail: Crunchyroll's own "Popular" ordering. */
+    suspend fun trending(n: Int = 30): List<Series> =
+        rpc("browse", mapOf("sort" to "popularity", "n" to n)).list("series")
+
+    /** Shows that just got a new episode, one row per show. */
+    suspend fun newEpisodes(): List<Series> = rpc("recent").list("series")
 
     suspend fun seasons(seriesId: String): List<Season> =
         rpc("seasons", mapOf("seriesId" to seriesId)).list("seasons")

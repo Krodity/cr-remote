@@ -3,23 +3,38 @@
   "name": "cr-remote host",
   "version": "1.0.0",
   "description": "Lets the cr-remote Android app search Crunchyroll and drive this browser's player.",
-  "permissions": ["tabs", "storage", "alarms", "scripting", "webNavigation"],
+  "permissions": [
+    "tabs",
+    "storage",
+    "alarms",
+    "scripting",
+    "webNavigation",
+    "debugger"
+  ],
   "host_permissions": [
     "https://www.crunchyroll.com/*",
     "https://static.crunchyroll.com/*"
   ],
-  "background": { "service_worker": "background.js", "type": "module" },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
   "content_scripts": [
     {
       "matches": [
         "https://www.crunchyroll.com/*",
         "https://static.crunchyroll.com/*"
       ],
-      "js": ["content.js"],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle",
       "all_frames": true
     }
   ],
   "options_page": "options.html",
-  "action": { "default_popup": "options.html", "default_title": "cr-remote host" }
+  "action": {
+    "default_popup": "options.html",
+    "default_title": "cr-remote host"
+  }
 }

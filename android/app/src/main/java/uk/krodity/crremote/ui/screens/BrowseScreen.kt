@@ -3,6 +3,7 @@ package uk.krodity.crremote.ui.screens
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -31,6 +32,9 @@ fun BrowseScreen(
     results: List<Series>,
     searching: Boolean,
     searched: Boolean,
+    trending: List<Series>,
+    newEpisodes: List<Series>,
+    loadingTrending: Boolean,
     onQuery: (String) -> Unit,
     onSearch: () -> Unit,
     onOpen: (Series) -> Unit,
@@ -70,19 +74,46 @@ fun BrowseScreen(
                 body = "Try a shorter or differently spelled title.",
             )
 
-            results.isEmpty() -> EmptyState(
+            // No query yet: the home screen is the trending rail.
+            results.isEmpty() && loadingTrending ->
+                Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
+
+            results.isEmpty() && trending.isEmpty() && newEpisodes.isEmpty() -> EmptyState(
                 icon = Icons.Default.Search,
                 title = "Find something to watch",
                 body = "Search for a show, pick an episode, then control playback from here.",
             )
 
+            // Search results replace the home rails; with no query we show both.
+            results.isNotEmpty() -> LazyColumn(contentPadding = contentPadding) {
+                section("Results", results, onOpen)
+            }
+
             else -> LazyColumn(contentPadding = contentPadding) {
-                items(results, key = { it.id }) { s ->
-                    SeriesRow(s) { onOpen(s) }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .3f))
-                }
+                section("Trending now", trending, onOpen)
+                section("New episodes", newEpisodes, onOpen)
             }
         }
+    }
+}
+
+private fun LazyListScope.section(
+    heading: String,
+    items: List<Series>,
+    onOpen: (Series) -> Unit,
+) {
+    if (items.isEmpty()) return
+    item(key = "hdr-$heading") {
+        Text(
+            heading,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 16.dp, top = 10.dp, bottom = 6.dp),
+        )
+    }
+    items(items, key = { "$heading-${it.id}" }) { s ->
+        SeriesRow(s) { onOpen(s) }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .3f))
     }
 }
 
@@ -111,7 +142,7 @@ private fun SeriesRow(s: Series, onClick: () -> Unit) {
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            val meta = listOfNotNull(
+            val meta = s.latest ?: listOfNotNull(
                 s.seasons?.let { if (it > 1) "$it seasons" else null },
                 s.episodes?.let { "$it episodes" },
             ).joinToString(" · ")

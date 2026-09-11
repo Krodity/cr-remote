@@ -98,6 +98,60 @@ export async function search(q, n = 20) {
   };
 }
 
+/** The home-screen rail. `popularity` is Crunchyroll's own "Popular" ordering,
+ *  which is what a viewer means by "trending". */
+export async function browse(sort = "popularity", n = 30) {
+  const j = await get(
+    `/content/v2/discover/browse?n=${n}&sort_by=${encodeURIComponent(sort)}&type=series`
+  );
+  const data = j.data || [];
+  const items = (data[0] && data[0].items) ? data[0].items : data;
+  return {
+    series: items.filter((s) => s && s.id).map((s) => ({
+      id: s.id,
+      title: s.title,
+      slug: s.slug_title,
+      description: s.description || "",
+      episodes: s.series_metadata?.episode_count ?? null,
+      seasons: s.series_metadata?.season_count ?? null,
+      poster: poster(s),
+    })),
+  };
+}
+
+/** "Recently updated" = shows that just got a new episode.
+ *  Browsing episodes (not series) is what surfaces that; sorting series by
+ *  newly_added would instead list shows newly added to the catalogue.
+ *  Crunchyroll returns one row per dub/language, so collapse to one per series. */
+export async function recent(n = 100, cap = 30) {   // n=100 is Crunchyroll's max; 200 is a 400
+  const j = await get(
+    `/content/v2/discover/browse?n=${n}&sort_by=newly_added&type=episode`
+  );
+  const data = j.data || [];
+  const items = (data[0] && data[0].items) ? data[0].items : data;
+  const seen = new Set();
+  const out = [];
+  for (const e of items) {
+    const em = e?.episode_metadata || {};
+    const id = em.series_id;
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const num = em.episode_number ?? em.episode;
+    out.push({
+      id,
+      title: em.series_title || e.title || "",
+      slug: em.series_slug_title || null,
+      description: e.description || "",
+      episodes: null,
+      seasons: null,
+      poster: poster(e),
+      latest: [num != null ? `E${num}` : null, e.title].filter(Boolean).join(" · "),
+    });
+    if (out.length >= cap) break;
+  }
+  return { series: out };
+}
+
 export async function seasons(seriesId) {
   const j = await get(`/content/v2/cms/series/${seriesId}/seasons`);
   return {

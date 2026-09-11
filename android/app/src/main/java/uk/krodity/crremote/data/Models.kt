@@ -11,6 +11,8 @@ data class Series(
     val episodes: Int? = null,
     val seasons: Int? = null,
     val poster: String? = null,
+    /** Only set on the "New episodes" rail, e.g. "E24 · Bloodbath in Laos". */
+    val latest: String? = null,
 )
 
 data class Season(

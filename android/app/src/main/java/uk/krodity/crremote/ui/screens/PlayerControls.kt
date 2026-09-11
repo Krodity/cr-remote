@@ -5,6 +5,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
@@ -42,7 +43,9 @@ fun PlayerControls(
         shadowElevation = 8.dp,
         color = MaterialTheme.colorScheme.surface,
     ) {
-        Column(Modifier.fillMaxWidth()) {
+        // The Surface itself stays full-bleed so its background paints behind the
+        // gesture/nav bar; only the controls are inset, or they sit underneath it.
+        Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
             // Thin progress line doubles as the collapsed-state scrubber readout.
             if (!expanded) {
                 LinearProgressIndicator(

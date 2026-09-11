@@ -93,9 +93,43 @@ async function toPage(msg, { required = true } = {}) {
   }
   const errored = live.find((r) => r.error);
   if (errored && required) throw new Error(errored.error);
-  if (live.length) return live[0];
+  // about:blank subframes answer with a contentless snapshot; the frame that
+  // knows the episode is always the more useful answer.
+  if (live.length) return live.find((r) => r.episodeId) || live[0];
   if (!required) return null;
   throw new Error("the Crunchyroll tab is not responding — reload it");
+}
+
+/**
+ * Press a key as if the user did.
+ *
+ * A synthetic KeyboardEvent is untrusted, and Crunchyroll's own fullscreen
+ * handler calls requestFullscreen(), which the browser refuses without a real
+ * user gesture ("Permissions check failed"). Events injected through the
+ * debugger API are trusted and do grant that gesture -- this is the same reason
+ * ~/bin/cr-continue dispatches its click over CDP rather than calling .click().
+ *
+ * Costs a "started debugging this browser" infobar for the moment it is attached.
+ */
+async function trustedKey(tabId, { key, code, keyCode }) {
+  const target = { tabId };
+  await chrome.debugger.attach(target, "1.3");
+  try {
+    const base = {
+      key,
+      code,
+      windowsVirtualKeyCode: keyCode,
+      nativeVirtualKeyCode: keyCode,
+    };
+    await chrome.debugger.sendCommand(target, "Input.dispatchKeyEvent", {
+      ...base, type: "keyDown", text: key,
+    });
+    await chrome.debugger.sendCommand(target, "Input.dispatchKeyEvent", {
+      ...base, type: "keyUp",
+    });
+  } finally {
+    await chrome.debugger.detach(target).catch(() => {});
+  }
 }
 
 // ── RPC methods the phone can call ───────────────────────────────────────────
@@ -103,6 +137,8 @@ const METHODS = {
   ping: async () => ({ ok: true, at: Date.now() }),
 
   search: ({ q, n }) => CR.search(q, n ? Number(n) : 20),
+  browse: ({ sort, n }) => CR.browse(sort || "popularity", n ? Number(n) : 30),
+  recent: ({ n }) => CR.recent(n ? Number(n) : 100),
   seasons: ({ seriesId, id }) => CR.seasons(seriesId || id),
   episodes: ({ seasonId, id }) => CR.episodes(seasonId || id),
   upNext: ({ episodeId, id }) => CR.upNext(episodeId || id),
@@ -125,6 +161,28 @@ const METHODS = {
 
   /** Transport controls, executed against the page's own <video>. */
   control: async ({ action, value }) => {
+    if (action === "fullscreen") {
+      // Press "f", exactly as a viewer at the keyboard would: that drives
+      // Crunchyroll's own player fullscreen, not the browser window's.
+      const tab = await crTab();
+      if (!tab) throw new Error("no Crunchyroll tab is open in this browser");
+      try {
+        await chrome.tabs.update(tab.id, { active: true });
+        await trustedKey(tab.id, { key: "f", code: "KeyF", keyCode: 70 });
+        return { ok: true, method: "keypress-f" };
+      } catch (e) {
+        // Debugger unavailable (another client attached, or policy). Last
+        // resort: the browser window, which at least fills the screen.
+        const win = await chrome.windows.get(tab.windowId);
+        const state = win.state === "fullscreen" ? "normal" : "fullscreen";
+        await chrome.windows.update(tab.windowId, { state });
+        return {
+          ok: true,
+          method: "window-fullscreen",
+          note: `could not press f (${e?.message || e}); fell back to window fullscreen`,
+        };
+      }
+    }
     if (action === "next") {
       const tab = await crTab();
       const m = tab?.url?.match(/\/watch\/([^/?#]+)/);
