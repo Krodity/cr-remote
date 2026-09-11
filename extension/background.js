@@ -240,6 +240,11 @@ async function connect() {
     } catch {
       return;
     }
+    if (msg.type === "hello") {
+      // The broker's own reachable address, for the popup's pairing QR.
+      chrome.storage.local.set({ pairHost: msg.pairHost || "" });
+      return;
+    }
     try {
       ws.send(JSON.stringify({ id: msg.id, result: await dispatch(msg) }));
     } catch (e) {

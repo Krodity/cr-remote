@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import uk.krodity.crremote.data.PairLink
 import uk.krodity.crremote.ui.RemoteViewModel
 import uk.krodity.crremote.ui.screens.BrowseScreen
 import uk.krodity.crremote.ui.screens.PlayerControls
@@ -41,14 +42,11 @@ class MainActivity : ComponentActivity() {
         handlePairLink(intent)
     }
 
-    /** crremote://pair?broker=host:8774&token=… — the broker's /pair page links here
-     *  so the token never has to be typed on a phone keyboard. */
+    /** The broker's /pair page deep-links here so the token never has to be typed
+     *  on a phone keyboard. Scanning its QR code arrives via PairScreen instead,
+     *  through the same [PairLink] parser. */
     private fun handlePairLink(intent: Intent?) {
-        val uri = intent?.data ?: return
-        if (uri.scheme != "crremote" || uri.host != "pair") return
-        val broker = uri.getQueryParameter("broker") ?: return
-        val token = uri.getQueryParameter("token") ?: return
-        vm.pair(broker, token)
+        PairLink.parse(intent?.data)?.let { vm.pair(it.broker, it.token) }
     }
 }
 

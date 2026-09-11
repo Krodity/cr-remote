@@ -16,6 +16,7 @@ this box. The bearer token in ~/.config/cr-remote/token is a pairing secret, not
 a security boundary -- the tailnet is.
 """
 import asyncio
+import html
 import json
 import logging
 import os
@@ -49,19 +50,65 @@ PAIR_PAGE = """<!doctype html>
       place-items:center;padding:24px;background:#0a0a0a;color:#ececec}
  .card{max-width:22rem;text-align:center}
  h1{font-size:20px;margin:0 0 6px}
- p{color:#a1a1aa;margin:0 0 22px}
+ p{color:#a1a1aa;margin:0 0 18px}
+ /* Black on white whatever the page theme: an inverted QR is one plenty of
+    scanners quietly refuse. */
+ #qr{background:#fff;border-radius:12px;padding:10px;width:236px;height:236px;
+     box-sizing:border-box;margin:0 auto 14px}
+ #qr svg{display:block;width:100%;height:100%}
+ .warn{color:#f4a259;font-size:12px;margin:0 0 16px}
+ .or{font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin:0 0 14px}
  a.btn{display:block;padding:14px;border-radius:10px;background:#f47521;color:#1a0b00;
        font-weight:700;text-decoration:none}
  code{display:block;margin-top:20px;font-size:12px;color:#71717a;word-break:break-all}
 </style>
 <div class=card>
   <h1>Pair CR Remote</h1>
-  <p>Tap below on the phone that has the app installed.</p>
-  <a class=btn href="crremote://pair?broker=__BROKER__&token=__TOKEN__">Pair this phone</a>
-  <code>If nothing happens, install the app first, then reload this page.<br><br>
-  Broker: __BROKER__</code>
+  <div id=scan hidden>
+    <p>In the app, tap <b>Scan QR code</b> and point the phone at this screen.</p>
+    <div id=qr></div>
+    <p class=warn>This code carries the pairing token &mdash; don't screenshot or share it.</p>
+    <p class=or>or</p>
+  </div>
+  <!-- data-link, not just href: reading .href back would let the browser
+       normalise a URL the app has to see byte for byte. -->
+  <a class=btn id=link data-link="__LINK__" href="__LINK__">Tap to pair this phone</a>
+  <code>Broker: __BROKER__<br><br>
+  Nothing happened? Install the app first, then reload this page.</code>
 </div>
+<script src="/qrcode.js"></script>
+<script>
+(function () {
+  // No qrcode.js (not found next to the broker) just leaves the tap button.
+  if (!window.QR) return;
+  var box = document.getElementById("qr");
+  try {
+    box.innerHTML = QR.svg(document.getElementById("link").dataset.link,
+                           {ecl: "M", quiet: 2, label: "CR Remote pairing code"});
+    document.getElementById("scan").hidden = false;
+  } catch (e) {
+    console.error("could not draw the pairing QR", e);
+  }
+})();
+</script>
 """
+
+
+def qr_js() -> bytes | None:
+    """The vendored QR encoder, shared verbatim with the extension popup.
+
+    Looked up beside the broker first so an install can copy it there, then in
+    the repo layout. Missing is not fatal: the /pair page falls back to its
+    tap-to-pair button.
+    """
+    here = pathlib.Path(__file__).resolve().parent
+    for cand in (here / "qrcode.js", here.parent / "extension" / "qrcode.js"):
+        try:
+            return cand.read_bytes()
+        except OSError:
+            continue
+    log.warning("qrcode.js not found - the /pair page will have no QR code")
+    return None
 
 
 
@@ -80,6 +127,10 @@ def load_token() -> str:
 
 
 TOKEN = load_token()
+QR_JS = qr_js()
+# Host:port to advertise when the /pair page is opened on the PC itself --
+# a QR saying "localhost" is one the phone can never dial. Filled in at startup.
+ADVERTISED_HOST: str | None = None
 
 
 # ── host registry ────────────────────────────────────────────────────────────
@@ -144,6 +195,11 @@ async def ws_handler(ws):
     host = Host(hid, name, ws)
     HOSTS[hid] = host
     log.info("host connected: %s (%s) [%d online]", name, hid, len(HOSTS))
+    # Tell the extension which address a phone should be handed. A browser on
+    # this very machine is usually configured with "127.0.0.1", which is exactly
+    # the address a phone cannot use -- and only the broker knows the good one.
+    if ADVERTISED_HOST:
+        await ws.send(json.dumps({"type": "hello", "pairHost": ADVERTISED_HOST}))
     try:
         async for raw in ws:
             try:
@@ -216,14 +272,31 @@ class Handler(BaseHTTPRequestHandler):
             # to be retyped. Unauthenticated on purpose -- reaching this page at
             # all already means the visitor is on the tailnet.
             host = self.headers.get("Host") or f"127.0.0.1:{HTTP_PORT}"
-            page = (PAIR_PAGE.replace("__BROKER__", urllib.parse.quote(host))
-                             .replace("__TOKEN__", urllib.parse.quote(TOKEN)))
+            # Scanning changes who opens this page: it is now usually the PC,
+            # where Host is "localhost". Hand out the reachable address instead.
+            if (ADVERTISED_HOST and host.split(":")[0] in
+                    ("localhost", "127.0.0.1", "[::1]", "::1")):
+                host = ADVERTISED_HOST
+            link = (f"crremote://pair?broker={urllib.parse.quote(host)}"
+                    f"&token={urllib.parse.quote(TOKEN)}")
+            # Host is caller-controlled, so it is escaped on the way into the
+            # markup; the DOM hands the link back to the QR encoder decoded.
+            page = (PAIR_PAGE.replace("__LINK__", html.escape(link))
+                             .replace("__BROKER__", html.escape(host)))
             body = page.encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             return self.wfile.write(body)
+        if u.path == "/qrcode.js" and QR_JS:
+            # Served unauthenticated for the same reason /pair is: it is a static
+            # asset, and being on the tailnet is the access check.
+            self.send_response(200)
+            self.send_header("Content-Type", "application/javascript; charset=utf-8")
+            self.send_header("Content-Length", str(len(QR_JS)))
+            self.end_headers()
+            return self.wfile.write(QR_JS)
         if not self._authed():
             return
         if u.path == "/api/hosts":
@@ -287,7 +360,7 @@ def serve_http(bind: str):
 
 
 async def main():
-    global LOOP
+    global LOOP, ADVERTISED_HOST
     LOOP = asyncio.get_running_loop()
     logging.basicConfig(
         level=os.environ.get("CR_BROKER_LOG", "INFO").upper(),
@@ -297,6 +370,7 @@ async def main():
     ts = tailscale_ip()
     if ts:
         binds.append(ts)
+        ADVERTISED_HOST = f"{ts}:{HTTP_PORT}"
     else:
         log.warning("no tailscale address found - binding loopback only")
 

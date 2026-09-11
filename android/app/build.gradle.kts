@@ -55,6 +55,7 @@ dependencies {
     implementation(libs.gson)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    implementation(libs.zxing.android.embedded)
 
     testImplementation(libs.junit)
     debugImplementation(libs.androidx.compose.ui.tooling)

@@ -124,17 +124,26 @@ or copy it to the phone and open it (you'll need "install from unknown sources")
 > not for distribution. Rebuilding produces a different signature, so uninstall
 > before switching between someone else's build and your own.
 
-### Pair it — the easy way
+### Pair it — scan a QR
 
-On the phone, open:
+On the PC, click the extension icon and press **Show pairing QR**. On the phone,
+open the app and tap **Scan QR code**.
 
-```
-http://<broker-host>:8774/pair
-```
+That is the whole flow — the code carries both the broker address and the token,
+so nothing is typed and no URL has to be found. The broker's `/pair` page shows
+the same code if you would rather not open the popup; loaded on the PC it
+advertises the machine's Tailscale address, not `localhost`.
 
-Tap **Pair this phone**. The page hands the app a `crremote://pair?...` deep link
-carrying both the broker address and the token, so you never type the token on a
-phone keyboard.
+Camera permission is asked for at the moment you scan, and refusing it only
+costs you the scanner: the fields below still work.
+
+> The code *is* the pairing token in visual form. Don't screenshot it, and close
+> the popup when you are done.
+
+### Pair it — tap on the phone
+
+On the phone, open `http://<broker-host>:8774/pair` and tap
+**Tap to pair this phone**. Same deep link, fired directly instead of scanned.
 
 ### Pair it — by hand
 

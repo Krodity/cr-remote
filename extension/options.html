@@ -13,6 +13,13 @@
   .state { margin-top: 14px; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--line); }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
   .hint { color: var(--mut); font-size: 12px; margin-top: 4px; }
+  button.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+  /* White plate whatever the theme — an inverted QR is one many scanners refuse. */
+  #qr { background: #fff; border-radius: 8px; padding: 8px; width: 200px; height: 200px;
+        box-sizing: border-box; margin: 12px auto 6px; }
+  #qr svg { display: block; width: 100%; height: 100%; }
+  .warn { color: #b45309; font-size: 12px; margin: 0; text-align: center; }
+  @media (prefers-color-scheme: dark) { .warn { color: #f4a259; } }
 </style>
 <h1>cr-remote host</h1>
 <p class="sub">Pairs this browser with the Android remote.</p>
@@ -30,4 +37,12 @@
 <button id="save">Save &amp; connect</button>
 <div class="state" id="state"><span class="dot"></span><span id="msg">checking…</span></div>
 
+<button id="qrtoggle" class="ghost">Show pairing QR</button>
+<div id="qrbox" hidden>
+  <div id="qr"></div>
+  <p class="warn">Anyone who scans this can drive this browser's Crunchyroll. Don't screenshot or share it.</p>
+  <p class="hint" id="qraddr"></p>
+</div>
+
+<script src="qrcode.js"></script>
 <script src="options.js"></script>

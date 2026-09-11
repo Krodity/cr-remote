@@ -9,6 +9,7 @@ datastorePreferences = "1.2.1"
 securityCrypto = "1.1.0"
 gson = "2.14.0"
 coil = "3.6.2"
+zxing = "4.3.0"
 junit = "4.13.2"
 
 [libraries]
@@ -31,6 +32,7 @@ androidx-security-crypto = { module = "androidx.security:security-crypto", versi
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
+zxing-android-embedded = { module = "com.journeyapps:zxing-android-embedded", version.ref = "zxing" }
 junit = { module = "junit:junit", version.ref = "junit" }
 
 [plugins]

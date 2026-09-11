@@ -53,7 +53,7 @@ git clone <your-repo-url> cr-remote && cd cr-remote
 
 # 3. App
 adb install -r dist/cr-remote-1.0.0-debug.apk
-#    then open http://<host>:8774/pair on the phone and tap the button
+#    then click Show pairing QR in the extension popup and scan it from the app
 ```
 
 Full instructions: **[docs/SETUP.md](docs/SETUP.md)**
@@ -88,7 +88,7 @@ generated — there is no per-device key, no registration step, no account.
 |---|---|---|
 | Broker | `~/.config/cr-remote/token` | created on first run |
 | Extension | `chrome.storage.local` | you paste it into the options popup |
-| Android app | `DataStore` (app-private) | the `/pair` deep link, or typed in |
+| Android app | `DataStore` (app-private) | scanned from a QR, the `/pair` deep link, or typed in |
 
 Every device uses the **same** token. There is no limit on how many.
 
@@ -130,7 +130,8 @@ cat ~/.config/cr-remote/token      # new value
 ```
 
 Every device is now locked out and must be re-paired: update the extension's
-options, and re-run the `/pair` link on each phone. There is no way to revoke one
+options, and re-scan (or re-tap) the pairing code on each phone. The QR is drawn
+from whatever token the broker is currently serving, so it is never stale. There is no way to revoke one
 device without revoking all of them — a deliberate simplification for a
 single-household tool.
 
@@ -148,28 +149,50 @@ click the extension icon and fill in the broker (`ws://<host>:8775`), the token,
 and a name for the PC. **Save & connect** stores them in `chrome.storage.local`
 and immediately dials out.
 
+The popup also has **Show pairing QR**, which is how a phone gets paired without
+hunting for a URL — see below. It stays hidden until you ask for it, because the
+code *is* the token in visual form.
+
 The status line and the toolbar badge tell you where you stand: green/no badge
 means connected, a red `!` means it is not.
 
-### Pairing a phone — three routes
+### Pairing a phone — four routes
 
-**1. The `/pair` page (recommended).** On the phone, open
-`http://<broker-host>:8774/pair` and tap **Pair this phone**. The page is served
-by the broker itself and contains a deep link:
+All four carry the *same* payload, and the app parses it in one place
+(`PairLink`), so they cannot drift apart:
 
 ```
 crremote://pair?broker=<host>:8774&token=<token>
 ```
 
-The app registers that scheme, so the tap hands it both values at once and you
-never type a 32-character token on a phone keyboard. The page is unauthenticated
-on purpose — being able to load it already proves you are on the private network.
+**1. Scan a QR (recommended).** Open the app, tap **Scan QR code**, and point it
+at either the extension popup's **Show pairing QR** or the broker's `/pair` page
+on the PC. The code encodes exactly the deep link above, so nothing is typed and
+no URL has to be found. The encoder is a vendored ~13 KB file
+(`extension/qrcode.js`) shared byte-for-byte by the popup and the broker, which
+keeps the broker at "stdlib + `websockets`", works with no network, and sidesteps
+MV3's ban on remote scripts.
 
-**2. By hand.** Open the app and type the broker host and token on the pairing
+The extension popup is usually the nicer of the two: it already knows the broker
+address and the token. Which address it encodes is a trap worth knowing about —
+a browser running on the same machine as the broker is configured with
+`127.0.0.1`, the one address a phone *cannot* dial. So the broker announces its
+own reachable address when a host connects (`{"type":"hello","pairHost":…}`) and
+the popup prefers that. With no announcement to go on it falls back to deriving
+the HTTP host from the websocket one (the API sits on the port below, 8774 next
+to 8775) and warns you if that comes out as loopback.
+
+**2. The `/pair` page.** On the phone, open `http://<broker-host>:8774/pair` and
+tap **Tap to pair this phone** — the same deep link, fired directly. The page is
+unauthenticated on purpose: being able to load it already proves you are on the
+private network. Opened on the PC instead, it shows the QR and advertises the
+broker's Tailscale address rather than the `localhost` you typed.
+
+**3. By hand.** Open the app and type the broker host and token on the pairing
 screen. The host field is forgiving: `mypc`, `mypc:8774` and
 `http://mypc:8774` all normalise to the same thing.
 
-**3. Over adb.** Useful for setting up several devices:
+**4. Over adb.** Useful for setting up several devices:
 
 ```bash
 adb shell am start -a android.intent.action.VIEW \
@@ -285,20 +308,18 @@ keypress**, driving Crunchyroll's own player fullscreen. Cost: a
 
 **Security.** The broker binds loopback and the Tailscale address only, and the
 pairing token is a shared secret, not a security boundary — the private network
-is. **Do not expose the broker to the internet**: anyone who reaches it with the
+is. A pairing QR *is* that token: don't screenshot it, and don't leave it up on a
+shared screen. **Do not expose the broker to the internet**: anyone who reaches it with the
 token can drive your browser.
 
 ## Status
 
 Working and in daily use. Verified end-to-end: search, browse, trending, new
 episodes, resume points, play, pause, seek, ±10s, restart, mute, next episode,
-player fullscreen, and multi-device pairing.
+player fullscreen, QR pairing, and multi-device pairing.
 
 Not implemented: queueing, watchlist, subtitle/audio track selection, casting to
 anything other than a browser.
-
-Next up: **QR pairing** — scan a code on the PC instead of opening the `/pair`
-URL. See [TODO.md](TODO.md).
 
 ## License
 

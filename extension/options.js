@@ -30,6 +30,59 @@ async function render() {
        age < 120_000 ? "Connected" : `Last connected ${Math.round(age / 60000)} min ago`);
 }
 
+// ── pairing QR ───────────────────────────────────────────────────────────────
+// The popup holds the *websocket* address; the phone dials the HTTP API, which
+// the broker serves on the port just below it (8774 alongside 8775).
+function pairLink(brokerWs, token) {
+  const u = new URL(brokerWs);
+  const host = `${u.hostname}:${(Number(u.port) || 8775) - 1}`;
+  const link = `crremote://pair?broker=${encodeURIComponent(host)}` +
+               `&token=${encodeURIComponent(token)}`;
+  return { hostname: u.hostname, host, link };
+}
+
+const LOOPBACK = ["localhost", "127.0.0.1", "[::1]", "::1"];
+
+// Hidden until asked for: the code is the token in visual form, and the popup
+// is often open while a screen is being shared.
+$("qrtoggle").onclick = async () => {
+  const box = $("qrbox");
+  if (!box.hidden) {
+    box.hidden = true;
+    $("qr").innerHTML = "";
+    $("qrtoggle").textContent = "Show pairing QR";
+    return;
+  }
+  const broker = $("broker").value.trim();
+  const token = $("token").value.trim();
+  if (!/^wss?:\/\//.test(broker)) return flag("bad", "Broker must start with ws:// or wss://");
+  if (!token) return flag("bad", "Pairing token is required");
+
+  let info;
+  try {
+    info = pairLink(broker, token);
+  } catch {
+    return flag("bad", "Broker address is not a valid URL");
+  }
+
+  // The broker announces its own reachable address on connect. Trust that over
+  // the ws URL: a browser running beside the broker is configured with
+  // "127.0.0.1", which is the one address a phone cannot dial.
+  const { pairHost } = await chrome.storage.local.get("pairHost");
+  const host = pairHost || info.host;
+  const link = pairHost
+    ? `crremote://pair?broker=${encodeURIComponent(pairHost)}&token=${encodeURIComponent(token)}`
+    : info.link;
+
+  // Rendered fresh on every open, so a token edited above is the one encoded.
+  $("qr").innerHTML = QR.svg(link, { ecl: "M", quiet: 2, label: "CR Remote pairing code" });
+  $("qraddr").textContent = !pairHost && LOOPBACK.includes(info.hostname)
+    ? `Pairs to ${host} — the phone can't reach that. Use this PC's Tailscale name or IP.`
+    : `Pairs to ${host}. In the app: Scan QR code.`;
+  box.hidden = false;
+  $("qrtoggle").textContent = "Hide pairing QR";
+};
+
 function flag(kind, msg) {
   $("msg").textContent = msg;
   document.querySelector(".dot").style.background =

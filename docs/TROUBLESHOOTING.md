@@ -18,6 +18,22 @@ curl -s -H "Authorization: Bearer $(cat ~/.config/cr-remote/token)" \
 - Does the extension's broker field point at the right host, `ws://` not `http://`?
 - Does its token match `~/.config/cr-remote/token` exactly?
 
+### Scanning the pairing QR does nothing useful
+
+- **"That code isn't a CR Remote pairing code."** You scanned something else. The
+  app only accepts `crremote://pair?broker=…&token=…`.
+- **The scanner never opens.** Camera permission was refused. Grant it in Android
+  settings, or pair with the fields below the button instead.
+- **It pairs, then every call fails.** The code most likely carried `localhost`.
+  The extension popup warns about this under the QR: put the PC's Tailscale name
+  or IP in the **Broker** field (`ws://<tailnet-host>:8775`), save, and re-show
+  the code. The broker's `/pair` page substitutes its own tailnet address, so it
+  is the safer of the two if you are unsure.
+- **No QR at all, just the tap button.** The broker could not find `qrcode.js`
+  next to `cr_broker.py` or in `../extension/`; it logs a warning saying so.
+- **After rotating the token**, reload the popup or the page — the code is drawn
+  from what the broker is serving right now, so a stale one cannot linger.
+
 ### "Not signed in to Crunchyroll in this browser"
 
 The extension has no credentials of its own. Open `crunchyroll.com` **in that

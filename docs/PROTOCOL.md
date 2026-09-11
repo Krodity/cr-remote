@@ -7,7 +7,8 @@ broker uses to reach an extension. The phone never speaks the second one.
 
 ## HTTP API (phone → broker), port 8774
 
-All endpoints except `/api/health` and `/pair` need the pairing token:
+All endpoints except `/api/health`, `/pair` and `/qrcode.js` need the pairing
+token:
 
 ```
 Authorization: Bearer <token>
@@ -57,8 +58,21 @@ curl -s -H "Authorization: Bearer $TOK" \
 ```
 
 ### `GET /pair`
-An HTML page with a `crremote://pair?broker=…&token=…` deep link. Unauthenticated
-by design — reaching it already means you are on the private network.
+An HTML page carrying a `crremote://pair?broker=…&token=…` deep link, both as a
+tappable button and as a QR code drawn client-side from the identical string.
+Unauthenticated by design — reaching it already means you are on the private
+network.
+
+`broker` is taken from the request's `Host` header, except when that is loopback:
+the page is now often opened on the PC itself, and a QR saying `localhost` is one
+the phone can never dial, so the broker's own Tailscale address is advertised
+instead.
+
+### `GET /qrcode.js`
+The vendored QR encoder the page uses — the same file the extension popup loads,
+served verbatim from `extension/qrcode.js` (or a copy beside `cr_broker.py`).
+Unauthenticated: it is a static asset with nothing secret in it. If the file is
+missing the broker logs a warning and `/pair` falls back to its button alone.
 
 ---
 
@@ -143,6 +157,14 @@ Extension → broker:
 ```json
 {"id": 7, "result": { ... }}
 {"id": 7, "error": "Not signed in to Crunchyroll in this browser"}
+```
+
+Broker → extension, once on connect (only when the broker bound a Tailscale
+address). It is the address to put in a pairing QR — a browser running beside
+the broker is configured with `127.0.0.1`, the one address a phone cannot dial,
+and only the broker knows the good one:
+```json
+{"type": "hello", "pairHost": "100.64.0.1:8774"}
 ```
 
 Unsolicited status push (every ~2s, so the phone's scrubber moves without polling):
