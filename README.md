@@ -297,6 +297,9 @@ player fullscreen, and multi-device pairing.
 Not implemented: queueing, watchlist, subtitle/audio track selection, casting to
 anything other than a browser.
 
+Next up: **QR pairing** — scan a code on the PC instead of opening the `/pair`
+URL. See [TODO.md](TODO.md).
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
