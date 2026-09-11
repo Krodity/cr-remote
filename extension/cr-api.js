@@ -11,6 +11,7 @@ const BASIC = "Basic " + btoa("noaihdevm_6iyg0a8l0q:");
 const LOCALE = "en-US";
 
 let token = null;        // { access, expires }
+let accountId = null;    // UUID, needed for the playheads endpoint
 
 async function deviceId() {
   const { deviceId } = await chrome.storage.local.get("deviceId");
@@ -184,15 +185,26 @@ export async function episodes(seasonId) {
   };
 }
 
+/** The playheads endpoint is keyed by the account UUID from /accounts/v1/me.
+ *  Note it is `account_id` (a UUID) -- `external_id` is a different number and 404s. */
+async function account() {
+  if (accountId) return accountId;
+  const me = await get("/accounts/v1/me");
+  accountId = me.account_id;
+  if (!accountId) throw new Error("could not read the Crunchyroll account id");
+  return accountId;
+}
+
 /** Resume points, so the phone can show "continue from 12:04". */
 export async function playheads(episodeIds) {
   if (!episodeIds?.length) return { playheads: {} };
+  const acct = await account();
   const j = await get(
-    `/content/v2/aepc/playheads?content_ids=${episodeIds.join(",")}`
-  ).catch(() => ({ data: [] }));
+    `/content/v2/${acct}/playheads?content_ids=${episodeIds.join(",")}`
+  );
   const out = {};
   for (const p of j.data || []) {
-    out[p.content_id] = { seconds: p.playhead, finished: !!p.fully_watched };
+    out[p.content_id] = { seconds: Math.round(p.playhead || 0), finished: !!p.fully_watched };
   }
   return { playheads: out };
 }

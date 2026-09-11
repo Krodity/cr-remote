@@ -21,9 +21,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import uk.krodity.crremote.data.Episode
+import uk.krodity.crremote.data.Playhead
 import uk.krodity.crremote.data.Season
 import uk.krodity.crremote.data.Series
 import uk.krodity.crremote.ui.formatDuration
+import uk.krodity.crremote.ui.formatTime
 
 @Composable
 fun SeriesScreen(
@@ -33,6 +35,7 @@ fun SeriesScreen(
     episodes: List<Episode>,
     loading: Boolean,
     nowPlayingId: String?,
+    playheads: Map<String, Playhead>,
     onSeason: (Season) -> Unit,
     onPlay: (Episode) -> Unit,
     contentPadding: PaddingValues,
@@ -59,7 +62,7 @@ fun SeriesScreen(
         } else {
             LazyColumn(contentPadding = contentPadding) {
                 items(episodes, key = { it.id }) { ep ->
-                    EpisodeRow(ep, playing = ep.id == nowPlayingId) { onPlay(ep) }
+                    EpisodeRow(ep, ep.id == nowPlayingId, playheads[ep.id]) { onPlay(ep) }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .3f))
                 }
             }
@@ -68,7 +71,12 @@ fun SeriesScreen(
 }
 
 @Composable
-private fun EpisodeRow(ep: Episode, playing: Boolean, onPlay: () -> Unit) {
+private fun EpisodeRow(
+    ep: Episode,
+    playing: Boolean,
+    playhead: Playhead?,
+    onPlay: () -> Unit,
+) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -85,6 +93,26 @@ private fun EpisodeRow(ep: Episode, playing: Boolean, onPlay: () -> Unit) {
                     .size(width = 108.dp, height = 61.dp)
                     .clip(RoundedCornerShape(6.dp)),
             )
+            val progress = playhead?.let { ph ->
+                val dur = (ep.durationMs ?: 0L) / 1000.0
+                when {
+                    ph.finished -> 1f
+                    dur > 0 -> (ph.seconds / dur).toFloat().coerceIn(0f, 1f)
+                    else -> 0f
+                }
+            } ?: 0f
+            if (progress > 0.01f) {
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(3.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.scrim.copy(alpha = .6f),
+                    drawStopIndicator = {},
+                )
+            }
             if (playing) {
                 Box(
                     Modifier
@@ -118,8 +146,14 @@ private fun EpisodeRow(ep: Episode, playing: Boolean, onPlay: () -> Unit) {
                     )
                     Spacer(Modifier.width(4.dp))
                 }
+                val resume = when {
+                    playhead == null -> null
+                    playhead.finished -> "Watched"
+                    playhead.seconds > 30 -> "Resume ${formatTime(playhead.seconds.toDouble())}"
+                    else -> null
+                }
                 Text(
-                    formatDuration(ep.durationMs),
+                    listOfNotNull(formatDuration(ep.durationMs), resume).joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

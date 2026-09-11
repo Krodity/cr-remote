@@ -39,7 +39,7 @@ class SettingsRepo(private val context: Context) {
         context.dataStore.edit { it.clear() }
     }
 
-    /** Accept "aepc", "aepc:8774" or a full URL and always end up with a base URL. */
+    /** Accept "hostname", "hostname:8774" or a full URL and always end up with a base URL. */
     private fun normalise(raw: String): String {
         var s = raw.trim().removeSuffix("/")
         if (s.isEmpty()) return s

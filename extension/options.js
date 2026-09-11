@@ -3,7 +3,7 @@ const FIELDS = ["broker", "token", "name"];
 
 (async () => {
   const c = await chrome.storage.local.get(["broker", "token", "name"]);
-  $("broker").value = c.broker || "ws://aepc:8775";
+  $("broker").value = c.broker || "ws://localhost:8775";
   $("token").value = c.token || "";
   $("name").value = c.name || "";
   render();

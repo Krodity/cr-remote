@@ -5,12 +5,13 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-# Binds the tailnet address, so it must wait for Tailscale to have one.
-ExecStartPre=/usr/bin/tailscale status --self=true --peers=false
-ExecStart=/usr/bin/python3 %h/Projects/cr-remote/broker/cr_broker.py
+# The broker binds the Tailscale address when there is one, so give Tailscale a
+# moment to be ready. Leading "-" keeps this optional: machines without Tailscale
+# still start fine and simply bind loopback.
+ExecStartPre=-/usr/bin/tailscale status --self=true --peers=false
+ExecStart=/usr/bin/python3 %REPO%/broker/cr_broker.py
 Restart=on-failure
 RestartSec=5
-# Retry politely while Tailscale is still coming up at boot.
 StartLimitBurst=10
 StartLimitIntervalSec=120
 

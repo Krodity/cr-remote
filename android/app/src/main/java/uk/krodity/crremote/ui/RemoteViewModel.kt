@@ -15,6 +15,7 @@ import uk.krodity.crremote.data.Broker
 import uk.krodity.crremote.data.BrokerException
 import uk.krodity.crremote.data.Episode
 import uk.krodity.crremote.data.HostInfo
+import uk.krodity.crremote.data.Playhead
 import uk.krodity.crremote.data.PlayerStatus
 import uk.krodity.crremote.data.Season
 import uk.krodity.crremote.data.Series
@@ -39,6 +40,7 @@ data class UiState(
     val seasons: List<Season> = emptyList(),
     val season: Season? = null,
     val episodes: List<Episode> = emptyList(),
+    val playheads: Map<String, Playhead> = emptyMap(),
     val loadingSeries: Boolean = false,
 
     val status: PlayerStatus = PlayerStatus(),
@@ -157,6 +159,7 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
                 seasons = seasons, season = rest.first,
                 episodes = rest.second, loadingSeries = false,
             )
+            loadPlayheads(rest.second)
         }.onFailure {
             _ui.value = _ui.value.copy(loadingSeries = false)
             fail(it)
@@ -166,11 +169,21 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
     fun selectSeason(s: Season) = viewModelScope.launch {
         _ui.value = _ui.value.copy(season = s, loadingSeries = true, error = null)
         runCatching { broker.episodes(s.id) }
-            .onSuccess { _ui.value = _ui.value.copy(episodes = it, loadingSeries = false) }
+            .onSuccess {
+                _ui.value = _ui.value.copy(episodes = it, loadingSeries = false)
+                loadPlayheads(it)
+            }
             .onFailure {
                 _ui.value = _ui.value.copy(loadingSeries = false)
                 fail(it)
             }
+    }
+
+    /** Resume points are a nicety: a failure here must not break the episode list. */
+    private fun loadPlayheads(eps: List<Episode>) = viewModelScope.launch {
+        if (eps.isEmpty()) return@launch
+        runCatching { broker.playheads(eps.map { it.id }) }
+            .onSuccess { _ui.value = _ui.value.copy(playheads = _ui.value.playheads + it) }
     }
 
     fun clearSeries() {

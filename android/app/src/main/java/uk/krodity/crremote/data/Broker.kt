@@ -116,6 +116,15 @@ class Broker(private val config: () -> SettingsRepo.Config) {
     suspend fun episodes(seasonId: String): List<Episode> =
         rpc("episodes", mapOf("seasonId" to seasonId)).list("episodes")
 
+    /** Resume positions for a batch of episodes, keyed by episode id. */
+    suspend fun playheads(ids: List<String>): Map<String, Playhead> {
+        if (ids.isEmpty()) return emptyMap()
+        val obj = rpc("playheads", mapOf("ids" to ids.joinToString(",")))
+            .getAsJsonObject("playheads") ?: return emptyMap()
+        val g = Gson()
+        return obj.entrySet().associate { (k, v) -> k to g.fromJson(v, Playhead::class.java) }
+    }
+
     suspend fun play(episode: Episode) {
         rpc("play", mapOf("url" to episode.url, "id" to episode.id, "slug" to episode.slug))
     }

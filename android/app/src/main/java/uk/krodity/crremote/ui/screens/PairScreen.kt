@@ -25,7 +25,7 @@ fun PairScreen(
     initialToken: String,
     onPair: (String, String) -> Unit,
 ) {
-    var broker by rememberSaveable { mutableStateOf(initialBroker.ifBlank { "aepc" }) }
+    var broker by rememberSaveable { mutableStateOf(initialBroker) }
     var token by rememberSaveable { mutableStateOf(initialToken) }
 
     Column(
@@ -48,7 +48,7 @@ fun PairScreen(
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            "Easiest way: open http://aepc:8774/pair in this phone's browser and tap the button.",
+            "Easiest way: open http://<your-pc>:8774/pair in this phone's browser and tap the button.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.align(Alignment.CenterHorizontally),

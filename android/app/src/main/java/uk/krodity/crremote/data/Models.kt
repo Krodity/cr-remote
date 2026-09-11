@@ -41,6 +41,12 @@ data class Episode(
     val label: String get() = number?.let { "E$it" } ?: ""
 }
 
+/** How far into an episode this account already is. */
+data class Playhead(
+    val seconds: Int = 0,
+    val finished: Boolean = false,
+)
+
 /** Playback state as seen by the extension's content script. */
 data class PlayerStatus(
     val hasVideo: Boolean = false,

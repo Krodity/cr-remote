@@ -41,7 +41,7 @@ class MainActivity : ComponentActivity() {
         handlePairLink(intent)
     }
 
-    /** crremote://pair?broker=aepc:8774&token=… — the broker's /pair page links here
+    /** crremote://pair?broker=host:8774&token=… — the broker's /pair page links here
      *  so the token never has to be typed on a phone keyboard. */
     private fun handlePairLink(intent: Intent?) {
         val uri = intent?.data ?: return
@@ -147,6 +147,7 @@ private fun App(vm: RemoteViewModel) {
                     episodes = ui.episodes,
                     loading = ui.loadingSeries,
                     nowPlayingId = ui.status.episodeId,
+                    playheads = ui.playheads,
                     onSeason = vm::selectSeason,
                     onPlay = vm::play,
                     contentPadding = PaddingValues(bottom = 12.dp),

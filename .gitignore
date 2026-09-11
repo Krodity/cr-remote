@@ -1,6 +1,16 @@
+# Gradle / Android build output
 android/.gradle/
+android/.kotlin/
 android/build/
 android/app/build/
 android/local.properties
-android/.kotlin/
+
+# Local secrets — the pairing token lives in ~/.config/cr-remote/token, never here
+token
+*.keystore
+
+# Everything except the published APK in dist/
 *.apk
+!dist/*.apk
+
+.DS_Store

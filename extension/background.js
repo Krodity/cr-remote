@@ -12,7 +12,7 @@
  */
 import * as CR from "./cr-api.js";
 
-const DEFAULTS = { broker: "ws://aepc:8775", token: "", name: "" };
+const DEFAULTS = { broker: "ws://localhost:8775", token: "", name: "" };
 const RETRY_MIN = 2_000;
 const RETRY_MAX = 60_000;
 
