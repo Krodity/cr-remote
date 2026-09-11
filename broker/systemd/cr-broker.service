@@ -1,0 +1,18 @@
+[Unit]
+Description=cr-broker — bridges the CR Remote Android app to browser extensions
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Binds the tailnet address, so it must wait for Tailscale to have one.
+ExecStartPre=/usr/bin/tailscale status --self=true --peers=false
+ExecStart=/usr/bin/python3 %h/Projects/cr-remote/broker/cr_broker.py
+Restart=on-failure
+RestartSec=5
+# Retry politely while Tailscale is still coming up at boot.
+StartLimitBurst=10
+StartLimitIntervalSec=120
+
+[Install]
+WantedBy=default.target
