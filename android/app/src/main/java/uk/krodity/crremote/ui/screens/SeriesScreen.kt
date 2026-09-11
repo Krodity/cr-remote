@@ -84,14 +84,20 @@ private fun EpisodeRow(
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box {
+        // The size belongs on the Box, not on the image: the overlays inside are
+        // fillMaxWidth/matchParentSize, and measured against the Row's own
+        // constraints instead they stretch the Box across the whole row and
+        // squeeze the title column to nothing.
+        Box(
+            Modifier
+                .size(width = 108.dp, height = 61.dp)
+                .clip(RoundedCornerShape(6.dp))
+        ) {
             AsyncImage(
                 model = ep.thumb,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(width = 108.dp, height = 61.dp)
-                    .clip(RoundedCornerShape(6.dp)),
+                modifier = Modifier.matchParentSize(),
             )
             val progress = playhead?.let { ph ->
                 val dur = (ep.durationMs ?: 0L) / 1000.0
@@ -117,7 +123,6 @@ private fun EpisodeRow(
                 Box(
                     Modifier
                         .matchParentSize()
-                        .clip(RoundedCornerShape(6.dp))
                         .background(MaterialTheme.colorScheme.scrim.copy(alpha = .5f)),
                     contentAlignment = Alignment.Center,
                 ) {
