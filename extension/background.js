@@ -20,8 +20,29 @@ let ws = null;
 let retry = RETRY_MIN;
 let statusTimer = null;
 
+/** Optional pre-seeded settings, so an install on the broker's own machine
+ *  needs no copy-pasting. local-config.json sits beside this file, is
+ *  git-ignored (it carries the token), and is read only while unpaired --
+ *  a token typed into the popup always wins. */
+async function seed() {
+  try {
+    const r = await fetch(chrome.runtime.getURL("local-config.json"));
+    if (!r.ok) return false;
+    const c = await r.json();
+    if (!c.token) return false;
+    await chrome.storage.local.set({
+      broker: c.broker || DEFAULTS.broker, token: c.token,
+      ...(c.name ? { name: c.name } : {}),
+    });
+    return true;
+  } catch {
+    return false;                          // no file: pair through the popup
+  }
+}
+
 async function config() {
-  const c = await chrome.storage.local.get(DEFAULTS);
+  let c = await chrome.storage.local.get(DEFAULTS);
+  if (!c.token && (await seed())) c = await chrome.storage.local.get(DEFAULTS);
   if (!c.name) {
     const p = await chrome.runtime.getPlatformInfo();
     c.name = `${p.os} browser`;
@@ -29,12 +50,18 @@ async function config() {
   return { ...DEFAULTS, ...c };
 }
 
-async function hostId() {
-  const { hostId } = await chrome.storage.local.get("hostId");
-  if (hostId) return hostId;
-  const id = crypto.randomUUID().slice(0, 8);
-  await chrome.storage.local.set({ hostId: id });
-  return id;
+// Memoised: startup fires connect() from several events at once, and parallel
+// first calls would each mint a different id -- one browser, three "PCs".
+let hostIdP = null;
+function hostId() {
+  hostIdP ||= (async () => {
+    const { hostId } = await chrome.storage.local.get("hostId");
+    if (hostId) return hostId;
+    const id = crypto.randomUUID().slice(0, 8);
+    await chrome.storage.local.set({ hostId: id });
+    return id;
+  })();
+  return hostIdP;
 }
 
 // ── talking to the watch page ────────────────────────────────────────────────
@@ -208,7 +235,21 @@ async function dispatch(msg) {
   return (await fn(msg.params || {})) ?? { ok: true };
 }
 
+let connecting = false;
+
 async function connect() {
+  // One socket at a time: install, startup, the alarm and a settings change can
+  // all ask for a connection within the same second.
+  if (connecting || ws?.readyState === WebSocket.OPEN || ws?.readyState === WebSocket.CONNECTING) return;
+  connecting = true;
+  try {
+    await dial();
+  } finally {
+    connecting = false;
+  }
+}
+
+async function dial() {
   const cfg = await config();
   if (!cfg.token) {
     setBadge("!", "#b91c1c");
@@ -252,7 +293,9 @@ async function connect() {
     }
   };
 
+  const sock = ws;
   ws.onclose = () => {
+    if (ws !== sock) return;               // an older socket we already replaced
     stopStatusPush();
     setBadge("!", "#b91c1c");
     schedule();
@@ -297,7 +340,9 @@ chrome.runtime.onInstalled.addListener(connect);
 chrome.storage.onChanged.addListener((ch) => {
   // Re-dial immediately when the options page saves new settings.
   if (ch.broker || ch.token || ch.name) {
-    try { ws?.close(); } catch {}
+    const old = ws;
+    ws = null;
+    try { old?.close(); } catch {}
     retry = RETRY_MIN;
     connect();
   }

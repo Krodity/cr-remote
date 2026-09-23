@@ -14,3 +14,7 @@ token
 !dist/*.apk
 
 .DS_Store
+
+# Per-machine extension pairing (carries the token)
+extension/local-config.json
+broker/__pycache__/
