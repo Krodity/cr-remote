@@ -1,7 +1,7 @@
 # cr-remote
 
-**An Android remote for Crunchyroll.** Search shows on your phone, pick an
-episode, and drive playback on a PC.
+**An Android (and iOS) remote for Crunchyroll.** Search shows on your phone,
+pick an episode, and drive playback on a PC.
 
 <p align="center">
   <img src="docs/images/home.png" width="260" alt="Trending shows on the home screen">
@@ -43,7 +43,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full picture.
 ## Quick start
 
 ```bash
-git clone <your-repo-url> cr-remote && cd cr-remote
+git clone https://github.com/Krodity/cr-remote.git && cd cr-remote
 
 # 1. Broker (once, on an always-on machine)
 ./broker/install.sh
@@ -275,6 +275,29 @@ the same browser. The broker imposes no limit on either.
 
 ---
 
+## iOS
+
+`ios/` is a SwiftUI port of the Android app (iOS 17+). It does the same
+things: search, Popular / New episodes rails, seasons and episodes, the full
+transport bar, and QR or manual pairing. It talks to the same broker with the
+same token.
+
+It's built on Linux with [xtool](https://github.com/xtool-org/xtool), so no Mac
+is needed:
+
+```bash
+# one-time: install xtool + a Swift 6 toolchain, then `xtool setup`
+# (signs in with your Apple ID and downloads the iOS SDK)
+cd ios
+./install.sh          # = xtool dev: build, sign, install on a USB-connected iPhone
+```
+
+With a free Apple ID, the signed app expires after 7 days. Run `./install.sh`
+again to refresh it. The broker address must be reachable from the phone
+(Tailscale on iOS works). `Info.plist` sets
+`NSAllowsArbitraryLoads` so the app can make plain HTTP calls to the broker. Pairing by hand takes `host:8774` plus the
+token. QR pairing needs camera permission.
+
 ## Documentation
 
 | | |
@@ -293,6 +316,7 @@ broker/       cr_broker.py — the rendezvous service (stdlib + websockets)
 extension/    MV3 extension: cr-api.js (Crunchyroll), background.js (broker
               link + RPC dispatch), content.js (the <video> element)
 android/      Kotlin + Compose app
+ios/          SwiftUI port of the app (built with xtool)
 dist/         prebuilt, debug-signed APK + SHA256SUMS
 docs/         the documents above
 ```
